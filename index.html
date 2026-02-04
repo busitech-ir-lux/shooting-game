@@ -1,43 +1,524 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Cyber Gesture Shooter Pro</title>
-                <style>
-                        body { margin: 0; overflow: hidden; background: #020205; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-                                #loading-overlay {
-                                            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-                                                        background: radial-gradient(circle, #1a1a2e 0%, #000 100%);
-                                                                    display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; color: #00fff2;
-                                                                            }
-                                                                                    .spinner {
-                                                                                                width: 60px; height: 60px; border: 4px solid rgba(0, 255, 242, 0.1);
-                                                                                                            border-top: 4px solid #00fff2; border-radius: 50%;
-                                                                                                                        animation: spin 1s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite; margin-bottom: 20px;
-                                                                                                                                }
-                                                                                                                                        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-                                                                                                                                                #ui { position: absolute; top: 30px; left: 30px; color: #00fff2; font-size: 28px; font-weight: bold; text-shadow: 0 0 10px #00fff2; pointer-events: none; }
-                                                                                                                                                        #video-hidden { display: none; }
-                                                                                                                                                            </style>
-                                                                                                                                                            </head>
-                                                                                                                                                            <body>
-
-                                                                                                                                                            <div id="loading-overlay">
-                                                                                                                                                                <div class="spinner"></div>
-                                                                                                                                                                    <div id="status">INITIALIZING NEON SYSTEMS...</div>
-                                                                                                                                                                    </div>
-
-                                                                                                                                                                    <div id="ui">CYBER_SCORE: <span id="score">0</span></div>
-                                                                                                                                                                    <video id="video-hidden" playsinline></video>
-
-                                                                                                                                                                    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js"></script>
-                                                                                                                                                                    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-                                                                                                                                                                    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
                                                                                                                                                                     <script>
                                                                                                                                                                     /** --- CONFIG & CORE --- **/
-                                                                                                                                                                    const VERSION = "0.4.1646424915";
+                       <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AR Finger Shooter</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+
+    <style>
+        /* CSS STYLING */
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden; /* Prevent scrolling */
+        }
+
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* The video is hidden visually but used for processing */
+        #input_video {
+            display: none; 
+        }
+
+        /* The canvas handles the display of video frames + game elements */
+        #output_canvas {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1); /* Mirror effect for natural feel */
+        }
+
+        /* UI Overlay Layer */
+        #ui_layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none; /* Let clicks pass through if needed */
+            z-index: 10;
+        }
+
+        /* HUD Elements */
+        .hud-panel {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.6);
+            color: #00ffcc;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #00ffcc;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        #score_board {
+            top: 20px;
+            left: 20px;
+        }
+
+        #status_msg {
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            color: white;
+            font-size: 16px;
+        }
+
+        /* Start Screen */
+        #start_screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            pointer-events: all;
+        }
+
+        h1 { color: #fff; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; }
+        p { color: #ccc; max-width: 500px; text-align: center; line-height: 1.5; }
+        
+        button {
+            background: #00ffcc;
+            color: #000;
+            border: none;
+            padding: 15px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 50px;
+            margin-top: 20px;
+            transition: transform 0.2s;
+        }
+        button:hover { transform: scale(1.05); background: #fff; }
+
+        /* Loading Spinner */
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #00ffcc;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            display: none; /* Hidden by default */
+            margin-top: 20px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+    </style>
+</head>
+<body>
+
+    <div id="container">
+        <video id="input_video" playsinline></video>
+        
+        <canvas id="output_canvas"></canvas>
+
+        <div id="ui_layer">
+            <div id="score_board" class="hud-panel">SCORE: <span id="score_val">0</span></div>
+            <div id="status_msg" class="hud-panel">Loading AI Model...</div>
+        </div>
+
+        <div id="start_screen">
+            <h1>AR Finger Shooter</h1>
+            <p>
+                1. Make a <b>"L" shape (Gun)</b> with your hand.<br>
+                2. Aim with your <b>Index Finger</b>.<br>
+                3. <b>Curl your Thumb</b> down to shoot.<br>
+            </p>
+            <div class="loader" id="loader"></div>
+            <button id="start_btn" onclick="startGame()">START GAME</button>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. GLOBAL VARIABLES & CONFIG
+        // ==========================================
+        const videoElement = document.getElementById('input_video');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const scoreEl = document.getElementById('score_val');
+        const statusEl = document.getElementById('status_msg');
+        const startScreen = document.getElementById('start_screen');
+        const loader = document.getElementById('loader');
+        const startBtn = document.getElementById('start_btn');
+
+        let isGameRunning = false;
+        let score = 0;
+        let lastShotTime = 0;
+        
+        // Game Entities
+        let targets = [];
+        let particles = []; // Explosion pieces
+
+        // Hand Tracking State
+        let handResults = null;
+        let isGunPose = false;
+        let isTriggerPulled = false;
+        
+        // Dimensions
+        canvasElement.width = window.innerWidth;
+        canvasElement.height = window.innerHeight;
+
+        // Audio Context (Synthesized sounds to avoid external assets)
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioContext();
+
+        // ==========================================
+        // 2. SOUND ENGINE (Synthesizer)
+        // ==========================================
+        function playSound(type) {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            if (type === 'shoot') {
+                // Laser Pew Sound
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.15);
+                gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.2);
+            } else if (type === 'hit') {
+                // Explosion/Break Sound
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.15);
+            }
+        }
+
+        // ==========================================
+        // 3. MEDIAPIPE HANDS SETUP
+        // ==========================================
+        const hands = new Hands({locateFile: (file) => {
+            return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+        }});
+
+        hands.setOptions({
+            maxNumHands: 1,
+            modelComplexity: 1, // 0=Lite, 1=Full. 1 is better for gesture accuracy
+            minDetectionConfidence: 0.6,
+            minTrackingConfidence: 0.6
+        });
+
+        hands.onResults(onResults);
+
+        const camera = new Camera(videoElement, {
+            onFrame: async () => {
+                await hands.send({image: videoElement});
+            },
+            width: 1280,
+            height: 720
+        });
+
+        // ==========================================
+        // 4. GESTURE RECOGNITION LOGIC
+        // ==========================================
+        function detectGesture(landmarks) {
+            // Landmarks Map:
+            // 0: Wrist
+            // 4: Thumb Tip
+            // 8: Index Tip
+            // 5: Index MCP (Knuckle)
+            // 12: Middle Tip
+            
+            // A. Detect "Gun" Shape
+            // Logic: Index finger extended, others curled
+            const isIndexExtended = landmarks[8].y < landmarks[6].y; // Tip above PIP joint
+            const isMiddleCurled = landmarks[12].y > landmarks[10].y; // Tip below PIP joint
+            const isRingCurled = landmarks[16].y > landmarks[14].y;
+            
+            // Simple check: Index up, Middle/Ring down. 
+            // Note: Coordinate Y increases downwards in computer vision usually, 
+            // but MediaPipe is normalized. Let's rely on distance to wrist (0).
+            
+            function dist(i1, i2) {
+                return Math.sqrt(Math.pow(landmarks[i1].x - landmarks[i2].x, 2) + Math.pow(landmarks[i1].y - landmarks[i2].y, 2));
+            }
+
+            const indexDist = dist(0, 8);
+            const middleDist = dist(0, 12);
+            const ringDist = dist(0, 16);
+
+            // Is Index significantly further from wrist than middle/ring?
+            const gunPoseDetected = (indexDist > middleDist * 1.2) && (indexDist > ringDist * 1.2);
+            isGunPose = gunPoseDetected;
+
+            // B. Detect Trigger (Thumb Action)
+            // Logic: Calculate distance between Thumb Tip (4) and Index MCP (5)
+            // If distance is SMALL -> Trigger Pulled. If LARGE -> Trigger Released.
+            const triggerDist = dist(4, 5); 
+            
+            // Thresholds need tuning based on hand size, but 0.05 is usually "touching"
+            const TRIGGER_THRESHOLD = 0.06; 
+
+            if (gunPoseDetected && triggerDist < TRIGGER_THRESHOLD) {
+                if (!isTriggerPulled) {
+                    // This frame is the moment the trigger was pressed
+                    shoot(landmarks[8]); 
+                    isTriggerPulled = true;
+                }
+            } else if (triggerDist > TRIGGER_THRESHOLD * 1.5) {
+                // Reset trigger when thumb moves away
+                isTriggerPulled = false;
+            }
+        }
+
+        // ==========================================
+        // 5. GAME LOGIC (Shooting & Physics)
+        // ==========================================
+        function shoot(aimTip) {
+            const now = Date.now();
+            if (now - lastShotTime < 200) return; // Fire rate limit
+            lastShotTime = now;
+
+            playSound('shoot');
+
+            // Visual Recoil (Shift canvas slightly)
+            // We handle this in the draw loop via a variable or simple CSS effect? 
+            // Let's do a logic check.
+
+            // Convert normalized coordinates to pixel coordinates
+            const aimX = (1 - aimTip.x) * canvasElement.width; // Mirror X
+            const aimY = aimTip.y * canvasElement.height;
+
+            // Check Collisions
+            for (let i = targets.length - 1; i >= 0; i--) {
+                const t = targets[i];
+                const dx = t.x - aimX;
+                const dy = t.y - aimY;
+                const distance = Math.sqrt(dx*dx + dy*dy);
+
+                // Hitbox is slightly larger than visual radius for better UX
+                if (distance < t.radius + 30) {
+                    createExplosion(t.x, t.y, t.color);
+                    targets.splice(i, 1);
+                    score += 10;
+                    scoreEl.innerText = score;
+                    playSound('hit');
+                    
+                    // Vibration feedback
+                    if (navigator.vibrate) navigator.vibrate(50);
+                }
+            }
+        }
+
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 8; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 10,
+                    vy: (Math.random() - 0.5) * 10,
+                    life: 1.0,
+                    color: color
+                });
+            }
+        }
+
+        function spawnTarget() {
+            if (!isGameRunning) return;
+            if (targets.length < 5) {
+                const r = 30 + Math.random() * 20;
+                targets.push({
+                    x: Math.random() * canvasElement.width,
+                    y: canvasElement.height + r, // Spawn at bottom
+                    radius: r,
+                    vx: (Math.random() - 0.5) * 2,
+                    vy: -1 - Math.random() * 2, // Move up
+                    color: `hsl(${Math.random() * 360}, 70%, 50%)`
+                });
+            }
+            // Spawn rate varies
+            setTimeout(spawnTarget, 1000 + Math.random() * 2000);
+        }
+
+        // ==========================================
+        // 6. MAIN RENDER LOOP
+        // ==========================================
+        function onResults(results) {
+            // Update Canvas Dimensions if window resized
+            if (canvasElement.width !== window.innerWidth) {
+                canvasElement.width = window.innerWidth;
+                canvasElement.height = window.innerHeight;
+            }
+
+            canvasCtx.save();
+            canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+            
+            // 1. Draw Video Feed
+            // Note: We don't draw the video on canvas because we have the video element behind it.
+            // But we can draw it if we want "Augmented Reality" effects to blend better.
+            // Here we leave the video element visible behind (CSS) and just draw overlays.
+            // Actually, for better composite, let's draw the video image on canvas.
+            canvasCtx.translate(canvasElement.width, 0);
+            canvasCtx.scale(-1, 1); // Mirror
+            canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+            canvasCtx.restore(); // Undo mirror for text/UI, but wait...
+            
+            // We want targets to be "in the world", so they shouldn't be mirrored relative to the hand?
+            // Since we mirrored the video draw, our coordinate system is now naturally mirrored relative to the webcam.
+            // Hand coordinates from MediaPipe are normalized (0-1).
+            
+            // Let's manage the Game Update Loop here
+            if (isGameRunning) {
+                updateGame(canvasCtx);
+            }
+
+            // 2. Process Hand
+            if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                const landmarks = results.multiHandLandmarks[0];
+                
+                // Draw Hand Skeleton (Optional, for debugging or sci-fi effect)
+                // drawConnectors(canvasCtx, landmarks, HAND_CONNECTIONS, {color: '#00FF00', lineWidth: 1});
+                
+                detectGesture(landmarks);
+
+                // Draw Reticle at Index Finger Tip
+                const indexTip = landmarks[8];
+                const x = (1 - indexTip.x) * canvasElement.width; // Mirror math manually for overlays
+                const y = indexTip.y * canvasElement.height;
+
+                // Draw Crosshair
+                canvasCtx.beginPath();
+                canvasCtx.arc(x, y, 15, 0, 2 * Math.PI);
+                canvasCtx.strokeStyle = isGunPose ? '#00ffcc' : 'rgba(255, 255, 255, 0.5)';
+                canvasCtx.lineWidth = 3;
+                canvasCtx.stroke();
+                
+                // Draw "Charging" indicator if Gun Pose active
+                if (isGunPose) {
+                    canvasCtx.beginPath();
+                    canvasCtx.arc(x, y, 25, 0, 2 * Math.PI);
+                    canvasCtx.strokeStyle = 'rgba(0, 255, 204, 0.3)';
+                    canvasCtx.lineWidth = 2;
+                    canvasCtx.stroke();
+                    statusEl.innerText = "GUN ACTIVE - PINCH THUMB TO SHOOT";
+                } else {
+                    statusEl.innerText = "MAKE 'L' SHAPE WITH HAND";
+                }
+            } else {
+                statusEl.innerText = "NO HAND DETECTED";
+            }
+
+            canvasCtx.restore();
+        }
+
+        function updateGame(ctx) {
+            // Update & Draw Targets
+            for (let i = 0; i < targets.length; i++) {
+                let t = targets[i];
+                t.x += t.vx;
+                t.y += t.vy;
+
+                // Wall bounce (optional) or wrap
+                if (t.x < 0 || t.x > canvasElement.width) t.vx *= -1;
+                
+                // Remove if off screen top
+                if (t.y + t.radius < 0) {
+                    targets.splice(i, 1);
+                    i--;
+                    continue;
+                }
+
+                // Draw Target
+                ctx.beginPath();
+                ctx.arc(t.x, t.y, t.radius, 0, Math.PI * 2);
+                ctx.fillStyle = t.color;
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Inner ring
+                ctx.beginPath();
+                ctx.arc(t.x, t.y, t.radius * 0.6, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+                ctx.stroke();
+            }
+
+            // Update & Draw Particles
+            for (let i = 0; i < particles.length; i++) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.05;
+
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                    i--;
+                    continue;
+                }
+
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1.0;
+            }
+        }
+
+        // ==========================================
+        // 7. INITIALIZATION
+        // ==========================================
+        function startGame() {
+            startBtn.style.display = 'none';
+            loader.style.display = 'block';
+            statusEl.innerText = "Starting Camera...";
+            
+            // Start Camera
+            camera.start()
+                .then(() => {
+                    startScreen.style.display = 'none';
+                    isGameRunning = true;
+                    spawnTarget();
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert("Camera failed to start. Please allow camera permissions.");
+                    loader.style.display = 'none';
+                    startBtn.style.display = 'block';
+                });
+        }
+
+    </script>
+</body>
+</html>
+                                                                                                                                             const VERSION = "0.4.1646424915";
                                                                                                                                                                     let score = 0;
                                                                                                                                                                     let canShoot = true;
                                                                                                                                                                     const targets = [];
