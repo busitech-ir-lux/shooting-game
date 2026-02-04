@@ -180,7 +180,18 @@
         let handResults = null;
         let isGunPose = false;
         let isTriggerPulled = false;
-        
+        let firstFrame = true;
+
+function onResults(results) {
+    if (firstFrame) {
+        firstFrame = false;
+        startScreen.style.display = 'none';
+        loader.style.display = 'none';
+        isGameRunning = true;
+        spawnTarget();
+    }
+    ...
+}
         // Dimensions
         canvasElement.width = window.innerWidth;
         canvasElement.height = window.innerHeight;
