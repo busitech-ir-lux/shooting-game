@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AR Gesture Shooter</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: #000;
+        font-family: sans-serif;
+      }
+      #loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        z-index: 100;
+        color: white;
+      }
+      .spinner {
+        width: 50px;
+        height: 50px;
+        border: 5px solid #333;
+        border-top: 5px solid #00ff88;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+      }
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+      canvas {
+        display: block;
+      }
+      #ui {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        color: #0f8;
+        font-size: 20px;
+        pointer-events: none;
+      }
+      #video-hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="loading-overlay">
+      <div class="spinner"></div>
+      <div id="status">Initializing AI & Camera...</div>
+    </div>
+
+    <div id="ui">SCORE: <span id="score">0</span></div>
+    <video id="video-hidden" playsinline></video>
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+      /** * CONFIG & STATE
+       */
+      const VERSION = "0.4.1646424915";
+      let score = 0;
+      let canShoot = true;
+      const targets = [];
+      const vfxs = [];
+      const MAX_TARGETS = 4;
+
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000,
+      );
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        alpha: true,
+      });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
+      scene.add(light);
+
+      // Laser & Crosshair
+      const laserGeometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, 0, -10),
+      ]);
+      const laserMaterial = new THREE.LineBasicMaterial({
+        color: 0xff0000,
+        transparent: true,
+        opacity: 0.5,
+      });
+      const laserLine = new THREE.Line(laserGeometry, laserMaterial);
+      scene.add(laserLine);
+
+      const crosshairGeo = new THREE.RingGeometry(0.02, 0.03, 32);
+      const crosshairMat = new THREE.MeshBasicMaterial({
+        color: 0x00ff00,
+        side: THREE.DoubleSide,
+      });
+      const crosshair = new THREE.Mesh(crosshairGeo, crosshairMat);
+      scene.add(crosshair);
+
+      /**
+       * AUDIO ENGINE (Procedural)
+       */
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      function playShootSound(hit) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = hit ? "square" : "sawtooth";
+        osc.frequency.setValueAtTime(hit ? 150 : 400, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(
+          0.01,
+          audioCtx.currentTime + 0.2,
+        );
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(
+          0.01,
+          audioCtx.currentTime + 0.2,
+        );
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.2);
+      }
+
+      /**
+       * GAME LOGIC
+       */
+      function spawnTarget() {
+        const geo = new THREE.TorusGeometry(0.3, 0.05, 16, 100);
+        const mat = new THREE.MeshPhongMaterial({
+          color: 0x00ffff,
+          emissive: 0x005555,
+        });
+        const target = new THREE.Mesh(geo, mat);
+
+        // Spawn at edges
+        const side = Math.random() > 0.5 ? 1 : -1;
+        target.position.set(
+          side * 5,
+          (Math.random() - 0.5) * 4,
+          -5 - Math.random() * 5,
+        );
+        target.velocity = new THREE.Vector3(
+          -target.position.x * 0.01,
+          -target.position.y * 0.01,
+          0.02,
+        );
+
+        scene.add(target);
+        targets.push(target);
+      }
+
+      function createTextVFX(msg, pos, color) {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = 256;
+        canvas.height = 128;
+        ctx.fillStyle = color;
+        ctx.font = "Bold 80px Arial";
+        ctx.fillText(msg, 10, 80);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMat = new THREE.SpriteMaterial({ map: texture });
+        const sprite = new THREE.Sprite(spriteMat);
+        sprite.position.copy(pos);
+        sprite.scale.set(0.5, 0.25, 1);
+        sprite.life = 1.0;
+        scene.add(sprite);
+        vfxs.push(sprite);
+      }
+
+      /**
+       * GESTURE RECOGNITION (MediaPipe)
+       */
+      const hands = new Hands({
+        locateFile: (file) =>
+          `https://cdn.jsdelivr.net/npm/@mediapipe/hands@${VERSION}/${file}`,
+      });
+
+      hands.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 1,
+        minDetectionConfidence: 0.7,
+        minTrackingConfidence: 0.7,
+      });
+
+      const videoElement = document.getElementById("video-hidden");
+      let handData = null;
+
+      hands.onResults((results) => {
+        try {
+          if (
+            results.multiHandLandmarks &&
+            results.multiHandLandmarks.length > 0
+          ) {
+            handData = results.multiHandLandmarks[0];
+          } else {
+            handData = null;
+          }
+        } catch (e) {
+          console.error("Detection Loop Error:", e);
+        }
+      });
+
+      const cameraUtils = new Camera(videoElement, {
+        onFrame: async () => {
+          // AI runs separately from render loop to save CPU
+          await hands.send({ image: videoElement });
+        },
+        width: 640,
+        height: 480,
+      });
+
+      /**
+       * MAIN LOOP
+       */
+      function update() {
+        requestAnimationFrame(update);
+
+        // 1. Process Gesture
+        if (handData) {
+          // Index Tip (Landmark 8) for aiming
+          const indexTip = handData[8];
+          const thumbTip = handData[4];
+          const indexBase = handData[5];
+
+          // Map to Screen Coords (-1 to 1)
+          // Flip X because webcam is mirrored
+          const aimX = (0.5 - indexTip.x) * 10;
+          const aimY = (0.5 - indexTip.y) * 8;
+
+          let targetPos = new THREE.Vector3(aimX, aimY, -8);
+
+          // 2. Magnetic Aim Assist
+          let bestTarget = null;
+          let minDist = 1.5;
+          targets.forEach((t) => {
+            const d = targetPos.distanceTo(t.position);
+            if (d < minDist) {
+              minDist = d;
+              bestTarget = t;
+            }
+          });
+
+          if (bestTarget) {
+            targetPos.lerp(bestTarget.position, 0.6); // Snap towards target
+            crosshair.material.color.setHex(0xff0000);
+          } else {
+            crosshair.material.color.setHex(0x00ff00);
+          }
+
+          crosshair.position.copy(targetPos);
+          laserLine.geometry.setFromPoints([
+            new THREE.Vector3(0, -2, 0),
+            targetPos,
+          ]);
+
+          // 3. Trigger Detection (Distance between thumb and index knuckle)
+          const triggerDist = Math.hypot(
+            thumbTip.x - indexBase.x,
+            thumbTip.y - indexBase.y,
+          );
+
+          // Pistol Logic: Thumb down = Shoot
+          if (triggerDist < 0.08 && canShoot) {
+            shoot(targetPos);
+            canShoot = false;
+            setTimeout(() => {
+              canShoot = true;
+            }, 300); // Fire rate limit
+          }
+        }
+
+        // 4. Update Entities
+        targets.forEach((t, i) => {
+          t.position.add(t.velocity);
+          t.rotation.y += 0.05;
+          // Reset if missed and gone too far
+          if (t.position.z > 2) {
+            scene.remove(t);
+            targets.splice(i, 1);
+          }
+        });
+
+        vfxs.forEach((v, i) => {
+          v.life -= 0.02;
+          v.position.y += 0.01;
+          v.material.opacity = v.life;
+          if (v.life <= 0) {
+            scene.remove(v);
+            vfxs.splice(i, 1);
+          }
+        });
+
+        while (targets.length < MAX_TARGETS) spawnTarget();
+
+        renderer.render(scene, camera);
+      }
+
+      function shoot(aimPos) {
+        let hitSomething = false;
+        targets.forEach((t, i) => {
+          if (aimPos.distanceTo(t.position) < 0.6) {
+            // HIT
+            createTextVFX("HIT!", t.position, "#0f8");
+            scene.remove(t);
+            targets.splice(i, 1);
+            score += 100;
+            hitSomething = true;
+          }
+        });
+
+        if (!hitSomething) {
+          createTextVFX("MISS", aimPos, "#f44");
+        }
+
+        document.getElementById("score").innerText = score;
+        playShootSound(hitSomething);
+      }
+
+      // Initialization
+      cameraUtils
+        .start()
+        .then(() => {
+          document.getElementById("loading-overlay").style.display = "none";
+          update();
+        })
+        .catch((err) => {
+          document.getElementById("status").innerText =
+            "Error: Camera access denied or version mismatch.";
+        });
+
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    </script>
+  </body>
+</html>
