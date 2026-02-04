@@ -496,23 +496,28 @@
         // 7. INITIALIZATION
         // ==========================================
         function startGame() {
-            startBtn.style.display = 'none';
-            loader.style.display = 'block';
-            statusEl.innerText = "Starting Camera...";
-            
-            // Start Camera
-            camera.start()
-                .then(() => {
-                    startScreen.style.display = 'none';
-                    isGameRunning = true;
-                    spawnTarget();
-                })
-                .catch(err => {
-                    console.error(err);
-                    alert("Camera failed to start. Please allow camera permissions.");
-                    loader.style.display = 'none';
-                    startBtn.style.display = 'block';
-                });
+    startBtn.style.display = 'none';
+    loader.style.display = 'block';
+    statusEl.innerText = "Starting Camera...";
+
+    try {
+        camera.start(); // NO .then()
+
+        // Give camera a short moment to initialize
+        setTimeout(() => {
+            startScreen.style.display = 'none';
+            loader.style.display = 'none';
+            isGameRunning = true;
+            spawnTarget();
+            statusEl.innerText = "SHOW YOUR HAND";
+        }, 500);
+
+    } catch (err) {
+        console.error(err);
+        alert("Camera failed to start. Please allow camera permissions.");
+        loader.style.display = 'none';
+        startBtn.style.display = 'block';
+    }
         }
 
     </script>
