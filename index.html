@@ -1,361 +1,234 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AR Gesture Shooter</title>
-    <style>
-      body {
-        margin: 0;
-        overflow: hidden;
-        background: #000;
-        font-family: sans-serif;
-      }
-      #loading-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.9);
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        z-index: 100;
-        color: white;
-      }
-      .spinner {
-        width: 50px;
-        height: 50px;
-        border: 5px solid #333;
-        border-top: 5px solid #00ff88;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        margin-bottom: 20px;
-      }
-      @keyframes spin {
-        0% {
-          transform: rotate(0deg);
-        }
-        100% {
-          transform: rotate(360deg);
-        }
-      }
-      canvas {
-        display: block;
-      }
-      #ui {
-        position: absolute;
-        top: 20px;
-        left: 20px;
-        color: #0f8;
-        font-size: 20px;
-        pointer-events: none;
-      }
-      #video-hidden {
-        display: none;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="loading-overlay">
-      <div class="spinner"></div>
-      <div id="status">Initializing AI & Camera...</div>
-    </div>
+<head>
+    <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Cyber Gesture Shooter Pro</title>
+                <style>
+                        body { margin: 0; overflow: hidden; background: #020205; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+                                #loading-overlay {
+                                            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                                                        background: radial-gradient(circle, #1a1a2e 0%, #000 100%);
+                                                                    display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; color: #00fff2;
+                                                                            }
+                                                                                    .spinner {
+                                                                                                width: 60px; height: 60px; border: 4px solid rgba(0, 255, 242, 0.1);
+                                                                                                            border-top: 4px solid #00fff2; border-radius: 50%;
+                                                                                                                        animation: spin 1s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite; margin-bottom: 20px;
+                                                                                                                                }
+                                                                                                                                        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                                                                                                                                                #ui { position: absolute; top: 30px; left: 30px; color: #00fff2; font-size: 28px; font-weight: bold; text-shadow: 0 0 10px #00fff2; pointer-events: none; }
+                                                                                                                                                        #video-hidden { display: none; }
+                                                                                                                                                            </style>
+                                                                                                                                                            </head>
+                                                                                                                                                            <body>
 
-    <div id="ui">SCORE: <span id="score">0</span></div>
-    <video id="video-hidden" playsinline></video>
+                                                                                                                                                            <div id="loading-overlay">
+                                                                                                                                                                <div class="spinner"></div>
+                                                                                                                                                                    <div id="status">INITIALIZING NEON SYSTEMS...</div>
+                                                                                                                                                                    </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+                                                                                                                                                                    <div id="ui">CYBER_SCORE: <span id="score">0</span></div>
+                                                                                                                                                                    <video id="video-hidden" playsinline></video>
 
-    <script>
-      /** * CONFIG & STATE
-       */
-      const VERSION = "0.4.1646424915";
-      let score = 0;
-      let canShoot = true;
-      const targets = [];
-      const vfxs = [];
-      const MAX_TARGETS = 4;
+                                                                                                                                                                    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js"></script>
+                                                                                                                                                                    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+                                                                                                                                                                    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(
-        75,
-        window.innerWidth / window.innerHeight,
-        0.1,
-        1000,
-      );
-      const renderer = new THREE.WebGLRenderer({
-        antialias: true,
-        alpha: true,
-      });
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      document.body.appendChild(renderer.domElement);
+                                                                                                                                                                    <script>
+                                                                                                                                                                    /** --- CONFIG & CORE --- **/
+                                                                                                                                                                    const VERSION = "0.4.1646424915";
+                                                                                                                                                                    let score = 0;
+                                                                                                                                                                    let canShoot = true;
+                                                                                                                                                                    const targets = [];
+                                                                                                                                                                    const particles = [];
+                                                                                                                                                                    let smoothAim = new THREE.Vector3(0, 0, 0);
 
-      const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
-      scene.add(light);
+                                                                                                                                                                    const scene = new THREE.Scene();
+                                                                                                                                                                    scene.fog = new THREE.Fog(0x020205, 5, 20);
 
-      // Laser & Crosshair
-      const laserGeometry = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(0, 0, -10),
-      ]);
-      const laserMaterial = new THREE.LineBasicMaterial({
-        color: 0xff0000,
-        transparent: true,
-        opacity: 0.5,
-      });
-      const laserLine = new THREE.Line(laserGeometry, laserMaterial);
-      scene.add(laserLine);
+                                                                                                                                                                    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                                                                                                                                                                    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+                                                                                                                                                                    renderer.setSize(window.innerWidth, window.innerHeight);
+                                                                                                                                                                    renderer.setPixelRatio(window.devicePixelRatio);
+                                                                                                                                                                    document.body.appendChild(renderer.domElement);
 
-      const crosshairGeo = new THREE.RingGeometry(0.02, 0.03, 32);
-      const crosshairMat = new THREE.MeshBasicMaterial({
-        color: 0x00ff00,
-        side: THREE.DoubleSide,
-      });
-      const crosshair = new THREE.Mesh(crosshairGeo, crosshairMat);
-      scene.add(crosshair);
+                                                                                                                                                                    // Lighting
+                                                                                                                                                                    const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+                                                                                                                                                                    scene.add(ambientLight);
+                                                                                                                                                                    const pointLight = new THREE.PointLight(0x00fff2, 2, 50);
+                                                                                                                                                                    pointLight.position.set(0, 5, 5);
+                                                                                                                                                                    scene.add(pointLight);
 
-      /**
-       * AUDIO ENGINE (Procedural)
-       */
-      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      function playShootSound(hit) {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = hit ? "square" : "sawtooth";
-        osc.frequency.setValueAtTime(hit ? 150 : 400, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(
-          0.01,
-          audioCtx.currentTime + 0.2,
-        );
-        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(
-          0.01,
-          audioCtx.currentTime + 0.2,
-        );
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.2);
-      }
+                                                                                                                                                                    // Raycaster for precision
+                                                                                                                                                                    const raycaster = new THREE.Raycaster();
 
-      /**
-       * GAME LOGIC
-       */
-      function spawnTarget() {
-        const geo = new THREE.TorusGeometry(0.3, 0.05, 16, 100);
-        const mat = new THREE.MeshPhongMaterial({
-          color: 0x00ffff,
-          emissive: 0x005555,
-        });
-        const target = new THREE.Mesh(geo, mat);
+                                                                                                                                                                    /** --- GRAPHICS: CROSSHAIR & LASER --- **/
+                                                                                                                                                                    const crosshairGeo = new THREE.TorusGeometry(0.15, 0.01, 16, 32);
+                                                                                                                                                                    const crosshairMat = new THREE.MeshBasicMaterial({ color: 0x00fff2 });
+                                                                                                                                                                    const crosshair = new THREE.Mesh(crosshairGeo, crosshairMat);
+                                                                                                                                                                    scene.add(crosshair);
 
-        // Spawn at edges
-        const side = Math.random() > 0.5 ? 1 : -1;
-        target.position.set(
-          side * 5,
-          (Math.random() - 0.5) * 4,
-          -5 - Math.random() * 5,
-        );
-        target.velocity = new THREE.Vector3(
-          -target.position.x * 0.01,
-          -target.position.y * 0.01,
-          0.02,
-        );
+                                                                                                                                                                    const laserMat = new THREE.LineBasicMaterial({ color: 0xff0033, transparent: true, opacity: 0.6 });
+                                                                                                                                                                    const laserGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, -2, 0), new THREE.Vector3(0, 0, -10)]);
+                                                                                                                                                                    const laserLine = new THREE.Line(laserGeo, laserMat);
+                                                                                                                                                                    scene.add(laserLine);
 
-        scene.add(target);
-        targets.push(target);
-      }
+                                                                                                                                                                    /** --- AUDIO --- **/
+                                                                                                                                                                    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                                                                                                                                                                    function playSFX(type) {
+                                                                                                                                                                        const osc = audioCtx.createOscillator();
+                                                                                                                                                                            const gain = audioCtx.createGain();
+                                                                                                                                                                                if(type === 'hit') {
+                                                                                                                                                                                        osc.type = 'square'; osc.frequency.setValueAtTime(200, audioCtx.currentTime);
+                                                                                                                                                                                                osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.1);
+                                                                                                                                                                                                    } else {
+                                                                                                                                                                                                            osc.type = 'triangle'; osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                                                                                                                                                                                                                    osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.1);
+                                                                                                                                                                                                                        }
+                                                                                                                                                                                                                            gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                                                                                                                                                                                                                                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                                                                                                                                                                                                                                    osc.connect(gain); gain.connect(audioCtx.destination);
+                                                                                                                                                                                                                                        osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+                                                                                                                                                                                                                                        }
 
-      function createTextVFX(msg, pos, color) {
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        canvas.width = 256;
-        canvas.height = 128;
-        ctx.fillStyle = color;
-        ctx.font = "Bold 80px Arial";
-        ctx.fillText(msg, 10, 80);
+                                                                                                                                                                                                                                        /** --- GAME OBJECTS --- **/
+                                                                                                                                                                                                                                        function spawnTarget() {
+                                                                                                                                                                                                                                            const group = new THREE.Group();
+                                                                                                                                                                                                                                                
+                                                                                                                                                                                                                                                    // Outer Ring
+                                                                                                                                                                                                                                                        const ringGeo = new THREE.TorusGeometry(0.5, 0.04, 16, 100);
+                                                                                                                                                                                                                                                            const ringMat = new THREE.MeshStandardMaterial({ color: 0x00fff2, emissive: 0x00fff2, emissiveIntensity: 2 });
+                                                                                                                                                                                                                                                                const ring = new THREE.Mesh(ringGeo, ringMat);
+                                                                                                                                                                                                                                                                    
+                                                                                                                                                                                                                                                                        // Inner Glow Core
+                                                                                                                                                                                                                                                                            const coreGeo = new THREE.SphereGeometry(0.2, 16, 16);
+                                                                                                                                                                                                                                                                                const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+                                                                                                                                                                                                                                                                                    const core = new THREE.Mesh(coreGeo, coreMat);
+                                                                                                                                                                                                                                                                                        
+                                                                                                                                                                                                                                                                                            group.add(ring);
+                                                                                                                                                                                                                                                                                                group.add(core);
+                                                                                                                                                                                                                                                                                                    
+                                                                                                                                                                                                                                                                                                        const side = Math.random() > 0.5 ? 1 : -1;
+                                                                                                                                                                                                                                                                                                            group.position.set(side * 6, (Math.random() - 0.5) * 5, -8 - Math.random() * 5);
+                                                                                                                                                                                                                                                                                                                group.velocity = new THREE.Vector3(-group.position.x * 0.008, -group.position.y * 0.008, 0.04);
+                                                                                                                                                                                                                                                                                                                    
+                                                                                                                                                                                                                                                                                                                        scene.add(group);
+                                                                                                                                                                                                                                                                                                                            targets.push(group);
+                                                                                                                                                                                                                                                                                                                            }
 
-        const texture = new THREE.CanvasTexture(canvas);
-        const spriteMat = new THREE.SpriteMaterial({ map: texture });
-        const sprite = new THREE.Sprite(spriteMat);
-        sprite.position.copy(pos);
-        sprite.scale.set(0.5, 0.25, 1);
-        sprite.life = 1.0;
-        scene.add(sprite);
-        vfxs.push(sprite);
-      }
+                                                                                                                                                                                                                                                                                                                            function createExplosion(pos) {
+                                                                                                                                                                                                                                                                                                                                for(let i=0; i<10; i++) {
+                                                                                                                                                                                                                                                                                                                                        const pGeo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+                                                                                                                                                                                                                                                                                                                                                const pMat = new THREE.MeshBasicMaterial({ color: 0x00fff2 });
+                                                                                                                                                                                                                                                                                                                                                        const p = new THREE.Mesh(pGeo, pMat);
+                                                                                                                                                                                                                                                                                                                                                                p.position.copy(pos);
+                                                                                                                                                                                                                                                                                                                                                                        p.velocity = new THREE.Vector3((Math.random()-0.5)*0.2, (Math.random()-0.5)*0.2, (Math.random()-0.5)*0.2);
+                                                                                                                                                                                                                                                                                                                                                                                p.life = 1.0;
+                                                                                                                                                                                                                                                                                                                                                                                        scene.add(p);
+                                                                                                                                                                                                                                                                                                                                                                                                particles.push(p);
+                                                                                                                                                                                                                                                                                                                                                                                                    }
+                                                                                                                                                                                                                                                                                                                                                                                                    }
 
-      /**
-       * GESTURE RECOGNITION (MediaPipe)
-       */
-      const hands = new Hands({
-        locateFile: (file) =>
-          `https://cdn.jsdelivr.net/npm/@mediapipe/hands@${VERSION}/${file}`,
-      });
+                                                                                                                                                                                                                                                                                                                                                                                                    /** --- AI & GESTURE --- **/
+                                                                                                                                                                                                                                                                                                                                                                                                    const hands = new Hands({ locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@${VERSION}/${file}` });
+                                                                                                                                                                                                                                                                                                                                                                                                    hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.8, minTrackingConfidence: 0.8 });
 
-      hands.setOptions({
-        maxNumHands: 1,
-        modelComplexity: 1,
-        minDetectionConfidence: 0.7,
-        minTrackingConfidence: 0.7,
-      });
+                                                                                                                                                                                                                                                                                                                                                                                                    let handData = null;
+                                                                                                                                                                                                                                                                                                                                                                                                    hands.onResults(results => { handData = results.multiHandLandmarks?.[0] || null; });
 
-      const videoElement = document.getElementById("video-hidden");
-      let handData = null;
+                                                                                                                                                                                                                                                                                                                                                                                                    const videoElement = document.getElementById('video-hidden');
+                                                                                                                                                                                                                                                                                                                                                                                                    const cameraUtils = new Camera(videoElement, {
+                                                                                                                                                                                                                                                                                                                                                                                                        onFrame: async () => { await hands.send({image: videoElement}); },
+                                                                                                                                                                                                                                                                                                                                                                                                            width: 640, height: 480
+                                                                                                                                                                                                                                                                                                                                                                                                            });
 
-      hands.onResults((results) => {
-        try {
-          if (
-            results.multiHandLandmarks &&
-            results.multiHandLandmarks.length > 0
-          ) {
-            handData = results.multiHandLandmarks[0];
-          } else {
-            handData = null;
-          }
-        } catch (e) {
-          console.error("Detection Loop Error:", e);
-        }
-      });
+                                                                                                                                                                                                                                                                                                                                                                                                            /** --- MAIN ENGINE --- **/
+                                                                                                                                                                                                                                                                                                                                                                                                            function update() {
+                                                                                                                                                                                                                                                                                                                                                                                                                requestAnimationFrame(update);
 
-      const cameraUtils = new Camera(videoElement, {
-        onFrame: async () => {
-          // AI runs separately from render loop to save CPU
-          await hands.send({ image: videoElement });
-        },
-        width: 640,
-        height: 480,
-      });
+                                                                                                                                                                                                                                                                                                                                                                                                                    if (handData) {
+                                                                                                                                                                                                                                                                                                                                                                                                                            // 1. Precise Aiming with Smoothing
+                                                                                                                                                                                                                                                                                                                                                                                                                                    const indexTip = handData[8];
+                                                                                                                                                                                                                                                                                                                                                                                                                                            const thumbTip = handData[4];
+                                                                                                                                                                                                                                                                                                                                                                                                                                                    const indexBase = handData[5];
+                                                                                                                                                                                                                                                                                                                                                                                                                                                            const wrist = handData[0];
 
-      /**
-       * MAIN LOOP
-       */
-      function update() {
-        requestAnimationFrame(update);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                    const targetX = (0.5 - indexTip.x) * 15;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                            const targetY = (0.5 - indexTip.y) * 10;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            smoothAim.x += (targetX - smoothAim.x) * 0.2;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    smoothAim.y += (targetY - smoothAim.y) * 0.2;
 
-        // 1. Process Gesture
-        if (handData) {
-          // Index Tip (Landmark 8) for aiming
-          const indexTip = handData[8];
-          const thumbTip = handData[4];
-          const indexBase = handData[5];
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            let finalPos = new THREE.Vector3(smoothAim.x, smoothAim.y, -8);
 
-          // Map to Screen Coords (-1 to 1)
-          // Flip X because webcam is mirrored
-          const aimX = (0.5 - indexTip.x) * 10;
-          const aimY = (0.5 - indexTip.y) * 8;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    // 2. Magnetic Snap
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            targets.forEach(t => {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        if (finalPos.distanceTo(t.position) < 1.8) {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        finalPos.lerp(t.position, 0.3);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            });
 
-          let targetPos = new THREE.Vector3(aimX, aimY, -8);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    crosshair.position.copy(finalPos);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            crosshair.rotation.z += 0.05;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    laserLine.geometry.setFromPoints([new THREE.Vector3(0, -2, 0), finalPos]);
 
-          // 2. Magnetic Aim Assist
-          let bestTarget = null;
-          let minDist = 1.5;
-          targets.forEach((t) => {
-            const d = targetPos.distanceTo(t.position);
-            if (d < minDist) {
-              minDist = d;
-              bestTarget = t;
-            }
-          });
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            // 3. Normalized Trigger Logic
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    const handScale = Math.hypot(wrist.x - indexBase.x, wrist.y - indexBase.y);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            const triggerDist = Math.hypot(thumbTip.x - indexBase.x, thumbTip.y - indexBase.y) / handScale;
 
-          if (bestTarget) {
-            targetPos.lerp(bestTarget.position, 0.6); // Snap towards target
-            crosshair.material.color.setHex(0xff0000);
-          } else {
-            crosshair.material.color.setHex(0x00ff00);
-          }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    if (triggerDist < 0.45 && canShoot) {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                fire(finalPos);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            canShoot = false;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        setTimeout(() => canShoot = true, 350);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    }
 
-          crosshair.position.copy(targetPos);
-          laserLine.geometry.setFromPoints([
-            new THREE.Vector3(0, -2, 0),
-            targetPos,
-          ]);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        // Update Targets & Particles
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            targets.forEach((t, i) => {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    t.position.add(t.velocity);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            t.rotation.x += 0.02;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    if(t.position.z > 1) { scene.remove(t); targets.splice(i, 1); }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        });
 
-          // 3. Trigger Detection (Distance between thumb and index knuckle)
-          const triggerDist = Math.hypot(
-            thumbTip.x - indexBase.x,
-            thumbTip.y - indexBase.y,
-          );
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            particles.forEach((p, i) => {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    p.position.add(p.velocity);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            p.life -= 0.02;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    p.material.opacity = p.life;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            if(p.life <= 0) { scene.remove(p); particles.splice(i, 1); }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                });
 
-          // Pistol Logic: Thumb down = Shoot
-          if (triggerDist < 0.08 && canShoot) {
-            shoot(targetPos);
-            canShoot = false;
-            setTimeout(() => {
-              canShoot = true;
-            }, 300); // Fire rate limit
-          }
-        }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    while(targets.length < 4) spawnTarget();
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        renderer.render(scene, camera);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        }
 
-        // 4. Update Entities
-        targets.forEach((t, i) => {
-          t.position.add(t.velocity);
-          t.rotation.y += 0.05;
-          // Reset if missed and gone too far
-          if (t.position.z > 2) {
-            scene.remove(t);
-            targets.splice(i, 1);
-          }
-        });
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        function fire(aimPos) {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            const origin = new THREE.Vector3(0, -2, 0);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                const direction = new THREE.Vector3().subVectors(aimPos, origin).normalize();
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    raycaster.set(origin, direction);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            const hits = raycaster.intersectObjects(targets, true);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    if(hits.length > 0) {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            let hitObj = hits[0].object;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    while(hitObj.parent && hitObj.parent !== scene) hitObj = hitObj.parent;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    createExplosion(hitObj.position);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            scene.remove(hitObj);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    targets.splice(targets.indexOf(hitObj), 1);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            score += 150;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    playSFX('hit');
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        } else {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                playSFX('miss');
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        document.getElementById('score').innerText = score;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        }
 
-        vfxs.forEach((v, i) => {
-          v.life -= 0.02;
-          v.position.y += 0.01;
-          v.material.opacity = v.life;
-          if (v.life <= 0) {
-            scene.remove(v);
-            vfxs.splice(i, 1);
-          }
-        });
-
-        while (targets.length < MAX_TARGETS) spawnTarget();
-
-        renderer.render(scene, camera);
-      }
-
-      function shoot(aimPos) {
-        let hitSomething = false;
-        targets.forEach((t, i) => {
-          if (aimPos.distanceTo(t.position) < 0.6) {
-            // HIT
-            createTextVFX("HIT!", t.position, "#0f8");
-            scene.remove(t);
-            targets.splice(i, 1);
-            score += 100;
-            hitSomething = true;
-          }
-        });
-
-        if (!hitSomething) {
-          createTextVFX("MISS", aimPos, "#f44");
-        }
-
-        document.getElementById("score").innerText = score;
-        playShootSound(hitSomething);
-      }
-
-      // Initialization
-      cameraUtils
-        .start()
-        .then(() => {
-          document.getElementById("loading-overlay").style.display = "none";
-          update();
-        })
-        .catch((err) => {
-          document.getElementById("status").innerText =
-            "Error: Camera access denied or version mismatch.";
-        });
-
-      window.addEventListener("resize", () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-      });
-    </script>
-  </body>
-</html>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        cameraUtils.start().then(() => {
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            document.getElementById('loading-overlay').style.display = 'none';
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                update();
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                });
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                </script>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                </body>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                </html>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                
